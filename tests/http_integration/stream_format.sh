@@ -20,6 +20,27 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 curl -fsS --max-time "$TIMEOUT" "${BASE_URL}/health" >/dev/null
 
+# A new query literal must be interned during stream metadata preparation.
+# This fails if the handler opens a READ ONLY transaction.
+LITERAL="stream-literal-$(basename "$TMP_DIR")"
+curl -fsS --max-time "$TIMEOUT" "${BASE_URL}/sparql/stream" \
+    "${AUTH_ARGS[@]}" \
+    -H 'Content-Type: application/x-www-form-urlencoded' \
+    -H 'Accept: application/sparql-results+json' \
+    --data-urlencode "query=SELECT (\"${LITERAL}\" AS ?label) WHERE {}" \
+    -o "$TMP_DIR/literal"
+python3 - "$TMP_DIR/literal" "$LITERAL" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as stream:
+    result = json.load(stream)
+assert result["head"]["vars"] == ["label"]
+assert result["results"]["bindings"][0]["label"] == {
+    "type": "literal", "value": sys.argv[2]
+}
+PY
+
 curl -fsS --max-time "$TIMEOUT" "${BASE_URL}/sparql/stream" \
     "${AUTH_ARGS[@]}" \
     -H 'Content-Type: application/x-www-form-urlencoded' \

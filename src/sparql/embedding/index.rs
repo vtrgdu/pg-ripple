@@ -626,7 +626,7 @@ pub(crate) fn sql_for_pg_similar(entity_col: &str, query_text: &str, _k: i64) ->
     // The generated SQL pattern:
     //   (SELECT (e.embedding <=> ref_emb.embedding)::float8
     //    FROM _pg_ripple.embeddings e
-    //    JOIN _pg_ripple.embeddings ref_emb ON ref_emb.entity_id = encode_term(query_text,0)
+    //    JOIN _pg_ripple.embeddings ref_emb ON ref_emb.entity_id = encode_term(query_text,0::int2)
     //    WHERE e.entity_id = <entity_col>
     //    LIMIT 1)
     //
@@ -639,10 +639,35 @@ pub(crate) fn sql_for_pg_similar(entity_col: &str, query_text: &str, _k: i64) ->
         "(SELECT (e.embedding <=> ref_emb.embedding)::float8 \
           FROM _pg_ripple.embeddings e, \
                _pg_ripple.embeddings ref_emb \
-          WHERE ref_emb.entity_id = pg_ripple.encode_term('{escaped_text}', 0) \
+          WHERE ref_emb.entity_id = pg_ripple.encode_term('{escaped_text}', 0::int2) \
             AND e.entity_id = {entity_col} \
           LIMIT 1)"
     )
 }
 
 // ─── v0.28.0: Advanced Hybrid Search & RAG Pipeline ──────────────────────────
+
+#[cfg(any(test, feature = "pg_test"))]
+#[pgrx::pg_schema]
+mod tests {
+    use super::*;
+
+    #[pgrx::pg_test]
+    fn similar_sql_resolves_encode_term_with_pgvector() {
+        if !pgvector_available_for_sparql() {
+            pgrx::warning!("skipping pg:similar SQL resolution test: pgvector unavailable");
+            return;
+        }
+
+        // PostgreSQL resolves functions and operators even without matching rows.
+        // A missing reference must yield NULL, including an IRI with an apostrophe.
+        let expression = sql_for_pg_similar(
+            "NULL::bigint",
+            "urn:pg-ripple:test:missing-reference's-vector",
+            10,
+        );
+        let distance = pgrx::Spi::get_one::<f64>(&format!("SELECT {expression}"))
+            .expect("generated pg:similar SQL must resolve against the SQL function signatures");
+        assert_eq!(distance, None);
+    }
+}

@@ -462,14 +462,12 @@ async fn stream_sparql_inner(
         DEFAULT_MAX_ROW_BYTES,
         MAX_ROW_BYTES,
     );
-    let transaction = if bindings.is_some() {
-        "BEGIN"
-    } else {
-        "BEGIN READ ONLY"
-    };
+    // SELECT compilation can intern literals in the RDF dictionary, including
+    // while preparing stream metadata. It therefore needs a writable transaction
+    // even when the SPARQL query itself only reads triples.
     if let Err(error) = client
         .batch_execute(&format!(
-            "{transaction}; SET LOCAL statement_timeout = '{timeout_ms}ms'; SET LOCAL idle_in_transaction_session_timeout = '{idle_ms}ms';"
+            "BEGIN; SET LOCAL statement_timeout = '{timeout_ms}ms'; SET LOCAL idle_in_transaction_session_timeout = '{idle_ms}ms';"
         ))
         .await
     {
