@@ -3,6 +3,8 @@
 **/*.bak
 **/*.orig
 **/*.swp
+*.sh
+*.sparql
 .pgrx/
 *.so
 *.dylib
