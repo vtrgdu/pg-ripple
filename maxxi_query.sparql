@@ -7,7 +7,8 @@ PREFIX pg:    <http://pg-ripple.org/functions/>
 # Deve usare lo stesso modello e dimensioni degli embedding dei passaggi.
 # In pg_ripple 0.136.0 pg:similar restituisce una distanza coseno,
 # non genera l'embedding della domanda e non seleziona il modello.
-# La soglia di similarità 0.65 è indicativa, da calibrare.
+# La soglia di similarità 0.52 è calibrata sui dati MAXXI attuali:
+# include "La Nona Ora" senza il richiamo architettonico a Piazza San Pietro.
 
 SELECT DISTINCT ?opera ?titolo ?artista ?nome
 WHERE {
@@ -33,9 +34,9 @@ WHERE {
                (ig:text|maxxi:text) ?testo .
   }
 
-  # Similarita >= 0.65 equivale a distanza coseno <= 0.35.
+  # Similarita >= 0.52 equivale a distanza coseno <= 0.48.
   # In 0.136.0 ABS forza il confronto tra valori numerici SQL e aggira
   # il bug nella gestione del risultato numerico di pg:similar.
-  FILTER(pg:similar(?passaggio, "urn:query:papa") <= ABS(0.35))
+  FILTER(pg:similar(?passaggio, "urn:query:papa") <= ABS(0.48))
 }
 ORDER BY ?nome ?titolo ?opera
